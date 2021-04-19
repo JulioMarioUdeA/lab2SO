@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
                         arg = strsep(&pocpy, " ");
                     }
 
-                    //################################ comparando comandos directos
+                    //################################ comparando comandos BUILD IN
                     if (strcmp(argumentos[0], "exit") == 0) //----   EXIT!!
                     {
                         liberarmd();
@@ -115,38 +115,26 @@ int main(int argc, char *argv[])
                     }
                     else if (strcmp(argumentos[0], "path") == 0) //----     PATH!!
                     {
-                        int pos = 0;
+                        liberarmd();
+                        mypath = NULL;
+
+                        char **tmp_ptr = realloc(mypath, sizeof(char *) * numargs);
+                        if (tmp_ptr == NULL)
+                        {
+                            printf("fallo en realocacion\n");
+                            write(STDERR_FILENO, error_message, strlen(error_message));
+                            liberarmd();
+                            exit(1);
+                        }
+                        mypath = tmp_ptr;
                         for (int i = 1; i < numargs; i++)
                         {
-                            pos = 0;
-                            int itis = 0;
-                            while (mypath[pos] != NULL)
-                            {
-                                if (strcmp(argumentos[i], mypath[pos]) == 0)
-                                {
-                                    itis = 1;
-                                    break;
-                                }
-                                pos++;
-                            }
-                            if (itis == 0)
-                            {
-                                int cont = pos + 2; //numero de posiciones del newmypath
-                                char **tmp_ptr = realloc(mypath, sizeof(char *) * cont);
-                                if (tmp_ptr == NULL)
-                                {
-                                    printf("fallo en realocacion\n");
-                                    write(STDERR_FILENO, error_message, strlen(error_message));
-                                    liberarmd();
-                                    exit(1);
-                                }
-                                mypath = tmp_ptr;
-                                mypath[cont - 1] = NULL;
-                                mypath[cont - 2] = malloc(sizeof(char) * (strlen(argumentos[i]) + 1));
-                                strcpy(mypath[cont - 2], argumentos[i]);
-                            }
+                            mypath[i - 1] = malloc(sizeof(char) * (strlen(argumentos[i]) + 1));
+                            strcpy(mypath[i - 1], argumentos[i]);
                         }
-                        pos = 0;
+                        mypath[numargs - 1] = NULL;
+
+                        int pos = 0;
                         while (mypath[pos] != NULL)
                         {
                             printf("path---->   %d-%ld-%s-%p", pos, strlen(mypath[pos]), mypath[pos], &mypath[pos]);
