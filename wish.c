@@ -6,10 +6,14 @@
 #include <sys/time.h>
 
 char error_message[30] = "An error has occurred\n";
-char *mypath[] = {"/bin/", NULL};
+char **mypath;
 
 int main(int argc, char *argv[])
 {
+    mypath = malloc(sizeof(char *) * 2);
+    mypath[0] = malloc(sizeof(char) * 6);
+    mypath[0] = "/bin/";
+    mypath[1] = NULL;
 
     if (argc == 1)
     {
@@ -37,10 +41,6 @@ int main(int argc, char *argv[])
                 }
 
                 printf("        -usted ingresó %s-\n", line);
-                if (strstr(line, "exit") != NULL || strstr("exit", line) != NULL)
-                {
-                    exit(0);
-                }
 
                 int numordenes = 0;
                 char *orden = strtok(line, "&");
@@ -89,23 +89,76 @@ int main(int argc, char *argv[])
                         arg = strsep(&pocpy, " ");
                     }
 
-                    //################################ creacion del proceso
-                    int proc = fork();
-                    if (proc < 0)
+                    //################################ comparando comandos directos
+                    if (strcmp(argumentos[0], "exit") == 0)
                     {
-                        write(STDERR_FILENO, error_message, strlen(error_message));
-                        exit(1);
+                        exit(0);
                     }
-                    else if (proc == 0)
+                    else if (strcmp(argumentos[0], "path") == 0)
                     {
-                        execvp(argumentos[0], argumentos);
-                        write(STDERR_FILENO, error_message, strlen(error_message));
-                        exit(1);
+                        int pos = 0;
+                        for (int i = 1; i < numargs; i++)
+                        {
+                            pos = 0;
+                            int itis = 0;
+                            while (mypath[pos] != NULL)
+                            {
+                                if (strcmp(argumentos[i], mypath[pos]) == 0)
+                                {
+                                    itis = 1;
+                                    break;
+                                }
+                                pos++;
+                            }
+                            if (itis == 0)
+                            {
+                                int cont = pos + 2; //numero de posiciones del newmypath
+                                char **tmp_ptr = realloc(mypath, sizeof(char *) * cont);
+                                if (tmp_ptr == NULL)
+                                {
+                                    printf("fallo en realocacion\n");
+                                    write(STDERR_FILENO, error_message, strlen(error_message));
+                                    exit(1);
+                                }
+                                mypath = tmp_ptr;
+                                mypath[cont - 1] = NULL;
+                                mypath[cont - 2] = malloc(sizeof(char) * (strlen(argumentos[i]) + 1));
+                                strcpy(mypath[cont - 2], argumentos[i]);
+                            }
+                        }
+                        pos = 0;
+                        while (mypath[pos] != NULL)
+                        {
+                            printf("path---->   %d-%ld-%s-%p", pos, strlen(mypath[pos]), mypath[pos], &mypath[pos]);
+                            printf("\n");
+                            pos++;
+                        }
+                    }
+                    else if (strcmp(argumentos[0], "cd") == 0)
+                    {
+                        /* code */
                     }
                     else
                     {
-                        wait(NULL);
+                        //################################ creacion del proceso
+                        int proc = fork();
+                        if (proc < 0)
+                        {
+                            write(STDERR_FILENO, error_message, strlen(error_message));
+                            exit(1);
+                        }
+                        else if (proc == 0)
+                        {
+                            execvp(argumentos[0], argumentos);
+                            write(STDERR_FILENO, error_message, strlen(error_message));
+                            exit(1);
+                        }
+                        else
+                        {
+                            wait(NULL);
+                        }
                     }
+
                     //################################## impresiones
 
                     if (orden == NULL)
