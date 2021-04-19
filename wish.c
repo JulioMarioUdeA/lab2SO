@@ -8,11 +8,29 @@
 char error_message[30] = "An error has occurred\n";
 char **mypath;
 
+char *concatenar(char *str1, char *str2)
+{
+    char sum[strlen(str1) + strlen(str2) + 1];
+    strcpy(sum, str1);
+    return strcat(sum, str2);
+}
+
+void liberarmd()
+{
+    int pos = 0;
+    while (mypath[pos] != NULL)
+    {
+        free(mypath[pos]);
+        pos++;
+    }
+    free(mypath);
+}
+
 int main(int argc, char *argv[])
 {
     mypath = malloc(sizeof(char *) * 2);
     mypath[0] = malloc(sizeof(char) * 6);
-    mypath[0] = "/bin/";
+    strcpy(mypath[0], "/bin/");
     mypath[1] = NULL;
 
     if (argc == 1)
@@ -90,11 +108,12 @@ int main(int argc, char *argv[])
                     }
 
                     //################################ comparando comandos directos
-                    if (strcmp(argumentos[0], "exit") == 0)
+                    if (strcmp(argumentos[0], "exit") == 0) //----   EXIT!!
                     {
+                        liberarmd();
                         exit(0);
                     }
-                    else if (strcmp(argumentos[0], "path") == 0)
+                    else if (strcmp(argumentos[0], "path") == 0) //----     PATH!!
                     {
                         int pos = 0;
                         for (int i = 1; i < numargs; i++)
@@ -118,6 +137,7 @@ int main(int argc, char *argv[])
                                 {
                                     printf("fallo en realocacion\n");
                                     write(STDERR_FILENO, error_message, strlen(error_message));
+                                    liberarmd();
                                     exit(1);
                                 }
                                 mypath = tmp_ptr;
@@ -134,9 +154,12 @@ int main(int argc, char *argv[])
                             pos++;
                         }
                     }
-                    else if (strcmp(argumentos[0], "cd") == 0)
+                    else if (strcmp(argumentos[0], "cd") == 0) //----    CD!!
                     {
-                        /* code */
+                        if (2 != numargs || -1 == chdir(argumentos[1]))
+                        {
+                            write(STDERR_FILENO, error_message, strlen(error_message));
+                        }
                     }
                     else
                     {
@@ -144,14 +167,31 @@ int main(int argc, char *argv[])
                         int proc = fork();
                         if (proc < 0)
                         {
+                            printf("fallo al crear proceso hijo\n");
                             write(STDERR_FILENO, error_message, strlen(error_message));
-                            exit(1);
+                            //liberarmd();
+                            //exit(1);
                         }
                         else if (proc == 0)
                         {
-                            execvp(argumentos[0], argumentos);
+                            int pos = 0;
+                            while (mypath[pos] != NULL)
+                            {
+                                char *argcompleto = concatenar(mypath[pos], argumentos[0]);
+                                if (access(argcompleto, X_OK) == 0)
+                                {
+                                    execv(argcompleto, argumentos);
+                                    printf("fallo al transformar proceso hijo\n");
+                                    write(STDERR_FILENO, error_message, strlen(error_message));
+                                    //liberarmd();
+                                    exit(1);
+                                }
+                                pos++;
+                            }
+                            printf("ese comando lo tendras que buscar en pasto por alla\n");
                             write(STDERR_FILENO, error_message, strlen(error_message));
-                            exit(1);
+                            //liberarmd();
+                            exit(0);
                         }
                         else
                         {
@@ -179,11 +219,6 @@ int main(int argc, char *argv[])
                         printf("        ~%s~\n", orden);
                     }
                 }
-
-                if (numordenes == 0)
-                {
-                    continue;
-                }
             }
         }
     }
@@ -192,5 +227,8 @@ int main(int argc, char *argv[])
     }
     else
     {
+        write(STDERR_FILENO, error_message, strlen(error_message));
+        liberarmd();
+        exit(1);
     }
 }
