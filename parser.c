@@ -42,7 +42,6 @@ int main(int argc, char *argv[])
             char *p = token;
             while (*p != '\0')
             {
-
                 if (*p == 13)
                 {
                     *p = '\0';
