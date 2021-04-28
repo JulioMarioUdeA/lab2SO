@@ -47,44 +47,21 @@ void liberarmd()
 
 void pillarComandos(char *line)
 {
-    //########################################################### obteniendo numero de ordenes-comandos
-
-    int numordenes = 0; //ordenes-comandos separados por &
-    char linecopy[strlen(line) + 1];
-    strcpy(linecopy, line);
-    char *plncpy = linecopy;
-    char *orden = strsep(&plncpy, "&");
+    int numordenes = 0;
+    char *orden = strsep(&line, "&");
     while (orden != NULL)
     {
         if (*orden != '\0')
         {
-            char *ordenvacia = strtok(orden, " ");
-            if (ordenvacia != NULL)
-            {
-                numordenes++;
-            }
-        }
-        orden = strsep(&plncpy, "&");
-    }
-    printf("        el numero de ordenes es %d\n", numordenes);
-
-    //########################################################## obteniendo ordenes-comandos
-
-    int numorden = 0; //solo para imprimir
-    orden = strsep(&line, "&");
-    while (orden != NULL)
-    {
-        if (*orden != '\0')
-        {
-            numorden++;
-            printf("        {%d-%ld-%s-%p}", numorden, strlen(orden), orden, &orden);
+            numordenes++;
+            printf("        {%d-%ld-%s-%p}", numordenes, strlen(orden), orden, &orden);
             printf("\n");
 
             char ordencopy[strlen(orden) + 1];
-            //char *pocpy = ordencopy;
+            char *pocpy = ordencopy;
             strcpy(ordencopy, orden);
 
-            printf("        [%d-%ld-%s-%p]", numorden, strlen(ordencopy), ordencopy, &ordencopy);
+            printf("        [%d-%ld-%s-%p]", numordenes, strlen(ordencopy), ordencopy, &ordencopy);
             printf("\n");
             //################################ obteniendo numero de argumentos
             int numargs = 0;
@@ -100,13 +77,12 @@ void pillarComandos(char *line)
             if (numargs != 0)
             {
                 //################################# extraccion de argumentos
-                char *argumentos[numargs + 1]; //char **argumentos = malloc((numargs + 1) * sizeof(char *));
+                char *argumentos[numargs + 1];
                 argumentos[numargs] = NULL;
                 numargs = 0;
                 arg = strtok(ordencopy, " ");
                 while (arg != NULL)
                 {
-
                     argumentos[numargs] = arg;
                     printf("        ¬¬%d-%ld-%s-%p¬¬", numargs, strlen(argumentos[numargs]), argumentos[numargs], &argumentos[numargs]);
                     printf("\n");
@@ -116,7 +92,7 @@ void pillarComandos(char *line)
                 }
 
                 //################################ comparando comandos BUILD IN
-                if (strcmp(argumentos[0], "exit") == 0) //----------------------------------EXIT!!
+                if (strcmp(argumentos[0], "exit") == 0) //----   EXIT!!
                 {
                     if (numargs != 1)
                     {
@@ -129,7 +105,7 @@ void pillarComandos(char *line)
                         exit(0);
                     }
                 }
-                else if (strcmp(argumentos[0], "path") == 0) //----------------------------PATH!!
+                else if (strcmp(argumentos[0], "path") == 0) //----     PATH!!
                 {
                     liberarmd();
                     mypath = NULL;
@@ -158,45 +134,49 @@ void pillarComandos(char *line)
                         pos++;
                     }
                 }
-                else if (strcmp(argumentos[0], "cd") == 0) //-----------------------------------CD!!
+                else if (strcmp(argumentos[0], "cd") == 0) //----    CD!!
                 {
                     if (2 != numargs || -1 == chdir(argumentos[1]))
                     {
                         write(STDERR_FILENO, error_message, strlen(error_message));
                     }
                 }
-                else //------------------------------------------------------------------------ELSE!!
+                else
                 {
-                    int pos = 0;
-                    int loencontro = 0;
-                    while (mypath[pos] != NULL)
+                    //################################ creacion del proceso
+                    int proc = fork();
+                    printf("padre %d creando a %d\n", getpid(), proc);
+                    if (proc < 0)
                     {
-                        char *argcompleto = concatenar(mypath[pos], argumentos[0]);
-                        if (access(argcompleto, X_OK) == 0)
+                        printf("fallo al crear proceso hijo\n");
+                        write(STDERR_FILENO, error_message, strlen(error_message));
+                        //liberarmd();
+                        //exit(1);
+                    }
+                    else if (proc == 0)
+                    {
+                        int pos = 0;
+                        while (mypath[pos] != NULL)
                         {
-                            loencontro = 1;
-                            //##################################################### creacion del proceso
-                            int proc = fork();
-                            if (proc < 0)
-                            {
-                                printf("fallo al crear proceso hijo\n");
-                                write(STDERR_FILENO, error_message, strlen(error_message));
-                            }
-                            else if (proc == 0)
+                            char *argcompleto = concatenar(mypath[pos], argumentos[0]);
+                            if (access(argcompleto, X_OK) == 0)
                             {
                                 execv(argcompleto, argumentos);
                                 printf("fallo al transformar proceso hijo\n");
                                 write(STDERR_FILENO, error_message, strlen(error_message));
-                                liberarmd();
+                                //liberarmd();
                                 exit(1);
                             }
+                            pos++;
                         }
-                        pos++;
-                    }
-                    if (loencontro == 0)
-                    {
                         printf("comando no encontrado\n");
                         write(STDERR_FILENO, error_message, strlen(error_message));
+                        //liberarmd();
+                        exit(0);
+                    }
+                    else
+                    {
+                        wait(NULL);
                     }
                 }
             }
@@ -221,10 +201,6 @@ void pillarComandos(char *line)
         {
             printf("        ~%s~\n", orden);
         }
-    } 
-    for (int i = 0; i < numordenes; i++)
-    {
-        wait(NULL);
     }
 }
 
@@ -269,7 +245,7 @@ int main(int argc, char *argv[])
         {
             if (limpiarSaltoln(line) == 1)
             {
-                printf("%d------------se ingresó %s-\n", pos, line);
+                printf("%d   -se ingresó %s-\n", pos, line);
                 pillarComandos(line);
                 printf("%d   -se ingresó %s-\n", pos, line);
                 pos++;
