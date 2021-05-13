@@ -20,22 +20,25 @@ int main(int argc, char *argv[])
         p++;
     }
 
-    int numordenes = 0; //ordenes-comandos separados por &
-    char linecopy[strlen(line) + 1];
-    strcpy(linecopy, line);
-    char *plncpy = linecopy;
-    char *orden = strsep(&plncpy, "&");
-    while (orden != NULL)
+    char *pedazo = strtok(line, ">");
+    while (pedazo != NULL)
     {
-        if (*orden != '\0')
+        if (*pedazo == '\0')
         {
-            char *ordenvacia = strtok(orden, " ");
-            if (ordenvacia != NULL)
-            {
-                numordenes++;
-            }
+            printf("/0\n");
         }
-        orden = strsep(&plncpy, "&");
+        else if (pedazo == NULL)
+        {
+            printf("NULL\n");
+        }
+        else
+        {
+            printf("-%s\n", pedazo);
+        }
+        pedazo = strtok(NULL, ">");
     }
-    printf("el numero de ordenes es %d\n", numordenes);
+    if (pedazo == NULL)
+    {
+        printf("NULL\n");
+    }
 }

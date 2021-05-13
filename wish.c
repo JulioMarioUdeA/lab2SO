@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <fcntl.h>
 #include <sys/wait.h>
 #include <sys/time.h>
 
@@ -13,6 +14,13 @@ char *concatenar(char *str1, char *str2)
     char sum[strlen(str1) + strlen(str2) + 1];
     strcpy(sum, str1);
     return strcat(sum, str2);
+}
+
+void concatenar1(char *sum, char *str1, char *str2)
+{
+    //char sum[strlen(str1) + strlen(str2) + 1];
+    strcpy(sum, str1);
+    strcat(sum, str2);
 }
 
 int limpiarSaltoln(char *line)
@@ -48,180 +56,255 @@ void liberarmd()
 void pillarComandos(char *line)
 {
     //########################################################### obteniendo numero de ordenes-comandos
-
+    int pos = 0;
     int numordenes = 0; //ordenes-comandos separados por &
     char linecopy[strlen(line) + 1];
     strcpy(linecopy, line);
     char *plncpy = linecopy;
-    char *orden = strsep(&plncpy, "&");
-    while (orden != NULL)
+    char *ordenfull = strsep(&plncpy, "&");
+    while (ordenfull != NULL)
     {
-        if (*orden != '\0')
+        if (*ordenfull != '\0')
         {
-            char *ordenvacia = strtok(orden, " ");
+            char *ordenvacia = strtok(ordenfull, " ");
             if (ordenvacia != NULL)
             {
                 numordenes++;
             }
         }
-        orden = strsep(&plncpy, "&");
+        ordenfull = strsep(&plncpy, "&");
     }
     printf("        el numero de ordenes es %d\n", numordenes);
 
     //########################################################## obteniendo ordenes-comandos
 
     int numorden = 0; //solo para imprimir
-    orden = strsep(&line, "&");
-    while (orden != NULL)
+    ordenfull = strsep(&line, "&");
+    while (ordenfull != NULL)
     {
-        if (*orden != '\0')
+        if (*ordenfull != '\0')
         {
-            numorden++;
-            printf("        {%d-%ld-%s-%p}", numorden, strlen(orden), orden, &orden);
-            printf("\n");
-
-            char ordencopy[strlen(orden) + 1];
-            //char *pocpy = ordencopy;
-            strcpy(ordencopy, orden);
-
-            printf("        [%d-%ld-%s-%p]", numorden, strlen(ordencopy), ordencopy, &ordencopy);
-            printf("\n");
-            //################################ obteniendo numero de argumentos
-            int numargs = 0;
-            char *arg = strtok(orden, " ");
-            while (arg != NULL)
+            //################################################## pillando redir y error en redir
+            pos = 0;
+            int erredir = 0;
+            int redir = 0;
+            char *pedazos[3];
+            pedazos[0] = NULL;
+            pedazos[1] = NULL;
+            pedazos[2] = NULL;
+            char *pedazo = strsep(&ordenfull, ">");
+            while (pedazo != NULL)
             {
-                numargs++;
-                printf("        <%d-%ld-%s-%p>", numargs, strlen(arg), arg, &arg);
-                printf("\n");
-
-                arg = strtok(NULL, " ");
-            }
-            if (numargs != 0)
-            {
-                //################################# extraccion de argumentos
-                char *argumentos[numargs + 1]; //char **argumentos = malloc((numargs + 1) * sizeof(char *));
-                argumentos[numargs] = NULL;
-                numargs = 0;
-                arg = strtok(ordencopy, " ");
-                while (arg != NULL)
+                if (pos == 2 || *pedazo == '\0')
                 {
-
-                    argumentos[numargs] = arg;
-                    printf("        ¬¬%d-%ld-%s-%p¬¬", numargs, strlen(argumentos[numargs]), argumentos[numargs], &argumentos[numargs]);
-                    printf("\n");
-                    numargs++;
-
-                    arg = strtok(NULL, " ");
+                    erredir = 1;
+                    break;
                 }
-
-                //################################ comparando comandos BUILD IN
-                if (strcmp(argumentos[0], "exit") == 0) //----------------------------------EXIT!!
+                pedazos[pos] = pedazo;
+                if (pos == 1)
                 {
-                    if (numargs != 1)
+                    char pedazocopia[strlen(pedazo) + 1];
+                    strcpy(pedazocopia, pedazo);
+                    char *pedazito = strtok(pedazocopia, " ");
+                    int cont = 0;
+                    while (pedazito != NULL)
                     {
-                        printf("exit no debe tener argumentos\n");
-                        write(STDERR_FILENO, error_message, strlen(error_message));
+                        cont++;
+                        pedazito = strtok(NULL, " ");
+                    }
+                    if (cont != 1)
+                    {
+                        erredir = 1;
+                        break;
                     }
                     else
                     {
-                        liberarmd();
-                        exit(0);
+                        pedazos[pos] = strtok(pedazo, " ");
                     }
                 }
-                else if (strcmp(argumentos[0], "path") == 0) //----------------------------PATH!!
+                pos++;
+                pedazo = strsep(&ordenfull, ">");
+            }
+
+            if (erredir == 0 && pedazos[0] != NULL) //########################## Todo bien con redir
+            {
+                if (pedazos[1] != NULL && *pedazos[1] != '\0')
                 {
-                    liberarmd();
-                    mypath = NULL;
+                    redir = 1;
+                }
 
-                    char **tmp_ptr = realloc(mypath, sizeof(char *) * numargs);
-                    if (tmp_ptr == NULL)
-                    {
-                        printf("fallo en realocacion\n");
-                        write(STDERR_FILENO, error_message, strlen(error_message));
-                        liberarmd();
-                        exit(1);
-                    }
-                    mypath = tmp_ptr;
-                    for (int i = 1; i < numargs; i++)
-                    {
-                        mypath[i - 1] = malloc(sizeof(char) * (strlen(argumentos[i]) + 1));
-                        strcpy(mypath[i - 1], argumentos[i]);
-                    }
-                    mypath[numargs - 1] = NULL;
+                //########################################## Ahora si aqui comienza el proceso de obtener ordenes-comandos
 
-                    int pos = 0;
-                    while (mypath[pos] != NULL)
+                char *orden = pedazos[0];
+                numorden++;
+                printf("        {%d-%ld-%s-%p}", numorden, strlen(orden), orden, &orden);
+                printf("\n");
+
+                char ordencopy[strlen(orden) + 1];
+                //char *pocpy = ordencopy;
+                strcpy(ordencopy, orden);
+
+                printf("        [%d-%ld-%s-%p]", numorden, strlen(ordencopy), ordencopy, &ordencopy);
+                printf("\n");
+                //################################ obteniendo numero de argumentos
+                int numargs = 0;
+                char *arg = strtok(orden, " ");
+                while (arg != NULL)
+                {
+                    numargs++;
+                    printf("        <%d-%ld-%s-%p>", numargs, strlen(arg), arg, &arg);
+                    printf("\n");
+
+                    arg = strtok(NULL, " ");
+                }
+                if (numargs != 0)
+                {
+                    //################################# extraccion de argumentos
+                    char *argumentos[numargs + 1]; //char **argumentos = malloc((numargs + 1) * sizeof(char *));
+                    argumentos[numargs] = NULL;
+                    numargs = 0;
+                    arg = strtok(ordencopy, " ");
+                    while (arg != NULL)
                     {
-                        printf("path---->   %d-%ld-%s-%p", pos, strlen(mypath[pos]), mypath[pos], &mypath[pos]);
+
+                        argumentos[numargs] = arg;
+                        printf("        ¬¬%d-%ld-%s-%p¬¬", numargs, strlen(argumentos[numargs]), argumentos[numargs], &argumentos[numargs]);
                         printf("\n");
-                        pos++;
+                        numargs++;
+
+                        arg = strtok(NULL, " ");
                     }
-                }
-                else if (strcmp(argumentos[0], "cd") == 0) //-----------------------------------CD!!
-                {
-                    if (2 != numargs || -1 == chdir(argumentos[1]))
+
+                    //################################ comparando comandos BUILD IN
+                    if (strcmp(argumentos[0], "exit") == 0) //----------------------------------EXIT!!
                     {
-                        write(STDERR_FILENO, error_message, strlen(error_message));
-                    }
-                }
-                else //------------------------------------------------------------------------ELSE!!
-                {
-                    int pos = 0;
-                    int loencontro = 0;
-                    while (mypath[pos] != NULL)
-                    {
-                        char *argcompleto = concatenar(mypath[pos], argumentos[0]);
-                        if (access(argcompleto, X_OK) == 0)
+                        if (numargs != 1)
                         {
-                            loencontro = 1;
-                            //##################################################### creacion del proceso
-                            int proc = fork();
-                            if (proc < 0)
-                            {
-                                printf("fallo al crear proceso hijo\n");
-                                write(STDERR_FILENO, error_message, strlen(error_message));
-                            }
-                            else if (proc == 0)
-                            {
-                                execv(argcompleto, argumentos);
-                                printf("fallo al transformar proceso hijo\n");
-                                write(STDERR_FILENO, error_message, strlen(error_message));
-                                liberarmd();
-                                exit(1);
-                            }
+                            printf("exit no debe tener argumentos\n");
+                            write(STDERR_FILENO, error_message, strlen(error_message));
                         }
-                        pos++;
+                        else
+                        {
+                            liberarmd();
+                            exit(0);
+                        }
                     }
-                    if (loencontro == 0)
+                    else if (strcmp(argumentos[0], "path") == 0) //----------------------------PATH!!
                     {
-                        printf("comando no encontrado\n");
-                        write(STDERR_FILENO, error_message, strlen(error_message));
+                        liberarmd();
+                        mypath = NULL;
+
+                        char **tmp_ptr = realloc(mypath, sizeof(char *) * numargs);
+                        if (tmp_ptr == NULL)
+                        {
+                            printf("fallo en realocacion\n");
+                            write(STDERR_FILENO, error_message, strlen(error_message));
+                            liberarmd();
+                            exit(1);
+                        }
+                        mypath = tmp_ptr;
+                        for (int i = 1; i < numargs; i++)
+                        {
+                            char sum[strlen(argumentos[i])+3];
+                            concatenar1(sum, "/", argumentos[i]);
+                            concatenar1(sum, sum, "/");
+                            mypath[i - 1] = malloc(sizeof(char) * (strlen(sum) + 1));
+                            strcpy(mypath[i - 1], sum);
+                        }
+                        mypath[numargs - 1] = NULL;
+
+                        pos = 0;
+                        while (mypath[pos] != NULL)
+                        {
+                            printf("path---->   %d-%ld-%s-%p", pos, strlen(mypath[pos]), mypath[pos], &mypath[pos]);
+                            printf("\n");
+                            pos++;
+                        }
+                    }
+                    else if (strcmp(argumentos[0], "cd") == 0) //-----------------------------------CD!!
+                    {
+                        if (2 != numargs || -1 == chdir(argumentos[1]))
+                        {
+                            write(STDERR_FILENO, error_message, strlen(error_message));
+                        }
+                    }
+                    else //------------------------------------------------------------------------ELSE!!
+                    {
+                        pos = 0;
+                        int loencontro = 0;
+                        while (mypath[pos] != NULL)// errorsillo con "path /bin/ /usr/bin/"
+                        {
+                            char *argcompleto = concatenar(mypath[pos], argumentos[0]);
+                            if (access(argcompleto, X_OK) == 0)
+                            {
+                                loencontro = 1;
+                                //##################################################### creacion del proceso
+                                int proc = fork();
+                                if (proc < 0)
+                                {
+                                    printf("fallo al crear proceso hijo\n");
+                                    write(STDERR_FILENO, error_message, strlen(error_message));
+                                }
+                                else if (proc == 0)
+                                {
+                                    if (redir == 1)
+                                    {
+                                        printf("si hay redir -%s-\n", pedazos[1]);
+
+                                        close(fileno(stdout));
+                                        close(fileno(stderr));
+
+                                        int out = open(pedazos[1], O_TRUNC | O_RDWR | O_CREAT | O_APPEND, 0600);
+                                        //int save_out = dup(fileno(stdout));
+                                        if (-1 == dup2(out, fileno(stdout)) || -1 == dup2(out, fileno(stderr)))
+                                        {
+                                            perror("cannot redirect stdout and stderr");
+                                        }
+                                    }
+                                    execv(argcompleto, argumentos);
+                                    printf("fallo al transformar proceso hijo\n");
+                                    write(STDERR_FILENO, error_message, strlen(error_message));
+                                    liberarmd();
+                                    exit(1);
+                                }
+                            }
+                            pos++;
+                        }
+                        if (loencontro == 0)
+                        {
+                            printf("comando no encontrado\n");
+                            write(STDERR_FILENO, error_message, strlen(error_message));
+                        }
                     }
                 }
+            }
+            else //####################################### Todo mal con redir
+            {
+                printf("error con redir\n");
+                write(STDERR_FILENO, error_message, strlen(error_message));
             }
         }
 
         //################################## impresiones
 
-        if (orden == NULL)
+        if (ordenfull == NULL)
         {
             printf("        orden null\n");
         }
         else
         {
-            printf("        ~%s~\n", orden);
+            printf("        ~%s~\n", ordenfull);
         }
-        orden = strsep(&line, "&");
-        if (orden == NULL)
+        ordenfull = strsep(&line, "&");
+        if (ordenfull == NULL)
         {
             printf("        orden null\n");
         }
         else
         {
-            printf("        ~%s~\n", orden);
+            printf("        ~%s~\n", ordenfull);
         }
-    } 
+    }
     for (int i = 0; i < numordenes; i++)
     {
         wait(NULL);

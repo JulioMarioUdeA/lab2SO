@@ -1,0 +1,7 @@
+carp
+pruebas
+pruebas.c
+redirect.c
+s.txt
+wish
+wish.c
